@@ -1,0 +1,53 @@
+---
+# ============================================================
+# CortexOps — Full Infrastructure Provisioning Playbook
+# Provisions a fresh Ubuntu server with everything needed
+# to run CortexOps SRE dashboard from scratch
+# ============================================================
+
+- name: CortexOps Full Stack Provisioning
+  hosts: cortexops_servers
+  become: true   # sudo access
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  pre_tasks:
+    - name: Print provisioning banner
+      debug:
+        msg: |
+          ============================================
+          ⚡ CortexOps Provisioning Started
+          Host    : {{ inventory_hostname }}
+          User    : {{ ansible_user }}
+          OS      : {{ ansible_distribution }} {{ ansible_distribution_version }}
+          ============================================
+
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: docker        # Install Docker + Docker Compose
+    - role: monitoring    # Deploy Prometheus + Grafana + Node Exporter
+    - role: backend       # Deploy FastAPI backend
+    - role: frontend      # Deploy Next.js frontend
+
+  post_tasks:
+    - name: Verify all services are running
+      include_tasks: tasks/verify.yml
+
+    - name: Print access URLs
+      debug:
+        msg: |
+          ============================================
+          CortexOps Provisioning Complete!
+          
+          Dashboard     : http://{{ ansible_host }}:3001
+          Backend API   : http://{{ ansible_host }}:8000
+          Prometheus    : http://{{ ansible_host }}:9090
+          Grafana       : http://{{ ansible_host }}:3000
+          Node Exporter : http://{{ ansible_host }}:9100
+          ============================================

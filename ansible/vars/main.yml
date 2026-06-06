@@ -1,0 +1,25 @@
+---
+# CortexOps — Global Variables
+
+app_name: cortexops
+app_dir: /opt/cortexops
+app_user: ubuntu
+
+backend_port: 8000
+frontend_port: 3001
+prometheus_port: 9090
+grafana_port: 3000
+node_exporter_port: 9100
+
+docker_compose_version: "2.24.0"
+python_version: "3.11"
+
+pip_packages:
+  - fastapi
+  - uvicorn
+  - requests
+  - python-dotenv
+  - docker
+
+prometheus_scrape_interval: 15s
+groq_api_key: "{{ lookup('env', 'GROQ_API_KEY') | default('') }}"

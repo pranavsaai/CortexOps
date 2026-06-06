@@ -1,0 +1,5 @@
+---
+- name: restart frontend
+  systemd:
+    name: cortexops-frontend
+    state: restarted

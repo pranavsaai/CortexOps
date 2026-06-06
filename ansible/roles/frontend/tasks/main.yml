@@ -1,0 +1,75 @@
+---
+# Role: frontend — Deploys Next.js frontend
+
+- name: Install Node.js 20 via NodeSource
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+  args:
+    creates: /usr/bin/node
+
+- name: Verify Node.js version
+  command: node --version
+  register: node_ver
+  changed_when: false
+
+- name: Show Node.js version
+  debug:
+    msg: "{{ node_ver.stdout }}"
+
+- name: Create frontend directory
+  file:
+    path: "{{ app_dir }}/frontend"
+    state: directory
+    owner: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy frontend source files
+  synchronize:
+    src: "{{ playbook_dir }}/../frontend/"
+    dest: "{{ app_dir }}/frontend/"
+    delete: true
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=.next"
+
+- name: Install npm dependencies
+  npm:
+    path: "{{ app_dir }}/frontend"
+    state: present
+  become_user: "{{ app_user }}"
+
+- name: Build Next.js production build
+  command: npm run build
+  args:
+    chdir: "{{ app_dir }}/frontend"
+  become_user: "{{ app_user }}"
+  environment:
+    NODE_ENV: production
+
+- name: Copy systemd service for frontend
+  template:
+    src: cortexops-frontend.service.j2
+    dest: /etc/systemd/system/cortexops-frontend.service
+    mode: '0644'
+  notify: restart frontend
+
+- name: Enable and start frontend service
+  systemd:
+    name: cortexops-frontend
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for frontend to respond
+  uri:
+    url: "http://localhost:{{ frontend_port }}"
+    status_code: 200
+  retries: 15
+  delay: 5
+  register: frontend_ready
+  until: frontend_ready.status == 200
+
+- name: Frontend is live
+  debug:
+    msg: "Next.js frontend running on port {{ frontend_port }}"
