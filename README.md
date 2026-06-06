@@ -341,6 +341,85 @@ The API key is **never sent to the frontend**. The browser only receives `{"ai_e
 
 ---
 
+# ⚡ CortexOps — Ansible Provisioning
+
+Automates full CortexOps stack deployment on any fresh Ubuntu 22.04 server.
+
+## What This Provisions
+
+| Role | What It Does |
+|---|---|
+| `docker` | Installs Docker Engine + Compose plugin, adds user to docker group |
+| `monitoring` | Deploys Prometheus + Grafana + Node Exporter via Docker Compose |
+| `backend` | Installs Python, creates venv, deploys FastAPI as systemd service |
+| `frontend` | Installs Node.js 20, builds Next.js, runs as systemd service |
+
+## Prerequisites
+
+```bash
+# Install Ansible on your local machine
+pip install ansible
+
+# Verify
+ansible --version
+```
+
+## Setup
+
+```bash
+# 1. Edit inventory — add your server IP
+nano inventory.ini
+
+# 2. Set your Groq API key
+export GROQ_API_KEY=gsk_your_key_here
+
+# 3. Test connectivity
+ansible all -m ping -i inventory.ini
+```
+
+## Run
+
+```bash
+# Full provisioning
+ansible-playbook playbook.yml -i inventory.ini
+
+# Dry run first (no changes)
+ansible-playbook playbook.yml -i inventory.ini --check
+
+# Only specific role
+ansible-playbook playbook.yml -i inventory.ini --tags docker
+ansible-playbook playbook.yml -i inventory.ini --tags monitoring
+
+# Local machine provisioning
+ansible-playbook playbook.yml -i inventory.ini -l local
+```
+
+## After Provisioning
+
+| Service | URL |
+|---|---|
+| Dashboard | `http://YOUR_IP:3001` |
+| Backend API | `http://YOUR_IP:8000` |
+| Prometheus | `http://YOUR_IP:9090` |
+| Grafana | `http://YOUR_IP:3000` |
+
+## Folder Structure
+
+```
+ansible/
+├── playbook.yml          # Main entry point
+├── inventory.ini         # Host definitions
+├── vars/
+│   └── main.yml          # Global variables
+├── tasks/
+│   └── verify.yml        # Post-deploy health checks
+└── roles/
+    ├── docker/           # Docker installation
+    ├── monitoring/       # Prometheus + Grafana stack
+    ├── backend/          # FastAPI deployment
+    └── frontend/         # Next.js deployment
+```
+
 ## 👨‍💻 Author
 
 **Kuchipudi Pranav Sai**
