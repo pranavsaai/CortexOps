@@ -1,0 +1,79 @@
+# ============================================================
+# CortexOps Backend — Deployment + Service
+# FastAPI app with 2 replicas for high availability
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cortexops-backend
+  namespace: cortexops
+  labels:
+    app: cortexops-backend
+spec:
+  replicas: 2          # 2 pods — if one crashes, other serves traffic
+  selector:
+    matchLabels:
+      app: cortexops-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0    # zero downtime deploys
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: cortexops-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      containers:
+        - name: cortexops-backend
+          image: pranavsaai/cortexops-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cortexops-secrets
+                  key: GROQ_API_KEY
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+
+---
+# ── Service ──────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: cortexops
+  labels:
+    app: cortexops-backend
+spec:
+  selector:
+    app: cortexops-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
