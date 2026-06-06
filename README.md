@@ -178,13 +178,28 @@ Response streams back to chat panel
 
 ## 🖥️ Screenshots
 
-> Dashboard — Live metric gauges, container stats, trend chart, recent incidents
+> Dashboard — Live metric gauges, container stats, trend chart, recent incidents:
 
-> AI Analysis — Risk assessment, recommendations, predicted issues, SRE chatbot
+<img width="1910" height="919" alt="image" src="https://github.com/user-attachments/assets/56faf793-983d-4fee-af30-d20cdcd96033" />
 
-> Incidents — Full incident log with severity classification and timestamps
 
-> Containers — Real-time Docker container monitoring with status indicators
+> AI Analysis — Risk assessment, recommendations, predicted issues, SRE chatbot:
+
+<img width="1913" height="916" alt="image" src="https://github.com/user-attachments/assets/6405b277-7ec3-4d33-a333-6f686ee9f28a" />
+
+
+> Incidents — Full incident log with severity classification and timestamps:
+
+<img width="1909" height="701" alt="image" src="https://github.com/user-attachments/assets/43ee640b-2e24-4f33-bd47-bd752b1e5458" />
+
+
+> Containers — Real-time Docker container monitoring with status indicators:
+
+<img width="1919" height="661" alt="image" src="https://github.com/user-attachments/assets/ba711dee-cba9-4611-9f2e-1f011feab538" />
+
+<img width="1918" height="911" alt="image" src="https://github.com/user-attachments/assets/fd9ebb72-21f2-4075-8fac-ccba2c603d40" />
+
+
 
 ---
 
@@ -331,7 +346,7 @@ The API key is **never sent to the frontend**. The browser only receives `{"ai_e
 **Kuchipudi Pranav Sai**
 B.Tech Computer Science · GITAM University, Visakhapatnam · 2026
 
-- GitHub: [Krishna945-crtl](https://github.com/Krishna945-crtl)
+- GitHub: [Pranav-Sai](https://github.com/pranavsaai)
 - Email: pkuchipu2@gitam.in
 
 ---
