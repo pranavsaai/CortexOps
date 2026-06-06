@@ -420,6 +420,124 @@ ansible/
     └── frontend/         # Next.js deployment
 ```
 
+# ⚡ CortexOps — Kubernetes Deployment
+
+Kubernetes manifests to deploy the full CortexOps stack on any K8s cluster (Minikube / Kind / EKS / GKE).
+
+## Architecture
+
+```
+Internet
+    ↓
+[ Ingress (Nginx) ]          ← single entry point
+    ↓           ↓
+[ Frontend ]  [ Backend ]    ← 2 replicas each, RollingUpdate
+    ↓               ↓
+              [ Prometheus ] ← scrapes metrics
+              [ Node Exporter DaemonSet ] ← 1 pod per node
+              [ Grafana ]    ← dashboards
+```
+
+## K8s Concepts Used
+
+| Concept | Where | Why |
+|---|---|---|
+| Namespace | `namespace/` | Isolates all CortexOps resources |
+| Deployment | backend, frontend, prometheus, grafana | Manages pod replicas + rollouts |
+| DaemonSet | node-exporter | Runs exactly 1 pod per cluster node |
+| Service (ClusterIP) | backend, prometheus, grafana | Internal pod-to-pod communication |
+| Service (NodePort) | frontend | External access on port 30001 |
+| ConfigMap | prometheus config | Stores config without rebuilding image |
+| Secret | Groq API key, Grafana password | Sensitive data — never in plain YAML |
+| HPA | backend | Auto-scales 2→10 pods on CPU > 70% |
+| Ingress | cortexops-ingress | Routes /api → backend, / → frontend |
+| ReadinessProbe | backend, frontend | K8s only routes traffic when pod is ready |
+| LivenessProbe | backend, prometheus | K8s auto-restarts unhealthy pods |
+
+## Local Setup (Minikube)
+
+```bash
+# 1. Start Minikube
+minikube start --memory=4096 --cpus=2
+
+# 2. Enable ingress addon
+minikube addons enable ingress
+
+# 3. Apply all manifests in order
+kubectl apply -f k8s/namespace/namespace.yml
+kubectl apply -f k8s/monitoring/configmap.yml
+kubectl apply -f k8s/monitoring/prometheus.yml
+kubectl apply -f k8s/monitoring/node-exporter.yml
+kubectl apply -f k8s/monitoring/grafana.yml
+kubectl apply -f k8s/backend/secret.yml      # edit GROQ_API_KEY first!
+kubectl apply -f k8s/backend/deployment.yml
+kubectl apply -f k8s/backend/hpa.yml
+kubectl apply -f k8s/frontend/deployment.yml
+kubectl apply -f k8s/ingress.yml
+
+# 4. Or apply everything at once
+kubectl apply -f k8s/ --recursive
+
+# 5. Check all pods are running
+kubectl get pods -n cortexops
+kubectl get services -n cortexops
+```
+
+## Useful Commands
+
+```bash
+# Watch pods come up in real time
+kubectl get pods -n cortexops -w
+
+# Check pod logs
+kubectl logs -f deployment/cortexops-backend -n cortexops
+kubectl logs -f deployment/cortexops-frontend -n cortexops
+
+# Describe a pod (debug crashes)
+kubectl describe pod <pod-name> -n cortexops
+
+# Check HPA scaling status
+kubectl get hpa -n cortexops
+
+# Port-forward to access locally
+kubectl port-forward service/frontend-service 3001:3001 -n cortexops
+kubectl port-forward service/prometheus-service 9090:9090 -n cortexops
+kubectl port-forward service/grafana-service 3000:3000 -n cortexops
+
+# Rolling update — update image and K8s does zero-downtime deploy
+kubectl set image deployment/cortexops-backend cortexops-backend=pranavsaai/cortexops-backend:v2 -n cortexops
+
+# Rollback if something breaks
+kubectl rollout undo deployment/cortexops-backend -n cortexops
+
+# Scale manually
+kubectl scale deployment cortexops-backend --replicas=5 -n cortexops
+
+# Delete everything
+kubectl delete namespace cortexops
+```
+
+## File Structure
+
+```
+k8s/
+├── namespace/
+│   └── namespace.yml           # cortexops namespace
+├── monitoring/
+│   ├── configmap.yml           # prometheus scrape config
+│   ├── prometheus.yml          # prometheus deployment + service
+│   ├── node-exporter.yml       # daemonset + service
+│   └── grafana.yml             # grafana deployment + secret
+├── backend/
+│   ├── secret.yml              # GROQ_API_KEY as K8s secret
+│   ├── deployment.yml          # fastapi deployment + service
+│   └── hpa.yml                 # auto-scaling config
+├── frontend/
+│   └── deployment.yml          # nextjs deployment + nodeport
+├── ingress.yml                 # nginx ingress routing
+└── README.md
+```
+
 ## 👨‍💻 Author
 
 **Kuchipudi Pranav Sai**
