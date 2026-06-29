@@ -1,0 +1,17 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+psutil==6.0.0
+requests==2.32.5
+python-dotenv==1.0.1
+docker==7.1.0
+psycopg2-binary==2.9.9
+redis==5.0.8
+grpcio==1.71.2
+grpcio-tools==1.71.2
+protobuf==5.28.3
+websockets==13.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+slowapi==0.1.9
+prometheus-fastapi-instrumentator==7.0.0
+pydantic==2.9.0

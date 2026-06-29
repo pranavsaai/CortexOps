@@ -1,23 +1,23 @@
 import docker
 
-client = docker.from_env()
-
+try:
+    client = docker.from_env()
+except Exception:
+    client = None  # Docker not running — gracefully handle!
 
 def get_containers():
-
-    containers = client.containers.list(all=True)
-
-    result = []
-
-    for container in containers:
-
-        result.append(
+    if client is None:
+        return []  # empty list return cheyyi — crash avvadam ledu
+    try:
+        containers = client.containers.list(all=True)
+        return [
             {
-                "id": container.short_id,
-                "name": container.name,
-                "status": container.status,
-                "image": container.image.tags
+                "id": c.short_id,
+                "name": c.name,
+                "status": c.status,
+                "image": c.image.tags[0] if c.image.tags else "unknown"
             }
-        )
-
-    return result
+            for c in containers
+        ]
+    except Exception:
+        return []
