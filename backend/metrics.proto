@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package cortexops;
+
+// Metrics service — CPU, Memory, Disk via gRPC
+service MetricsService {
+    rpc GetCPU (MetricsRequest) returns (CPUResponse);
+    rpc GetMemory (MetricsRequest) returns (MemoryResponse);
+    rpc GetDisk (MetricsRequest) returns (DiskResponse);
+    rpc GetAllMetrics (MetricsRequest) returns (AllMetricsResponse);
+}
+
+// AI Analysis service via gRPC
+service AIService {
+    rpc AnalyzeInfrastructure (AnalyzeRequest) returns (AnalyzeResponse);
+}
+
+message MetricsRequest {
+    string requester = 1;
+}
+
+message CPUResponse {
+    double cpu_percent = 1;
+    string timestamp = 2;
+    string source = 3; // "prometheus" or "psutil"
+}
+
+message MemoryResponse {
+    double memory_percent = 1;
+    string timestamp = 2;
+    string source = 3;
+}
+
+message DiskResponse {
+    double disk_percent = 1;
+    string timestamp = 2;
+    string source = 3;
+}
+
+message AllMetricsResponse {
+    double cpu_percent = 1;
+    double memory_percent = 2;
+    double disk_percent = 3;
+    int32 reliability_score = 4;
+    string health_status = 5;
+    string timestamp = 6;
+}
+
+message AnalyzeRequest {
+    double cpu = 1;
+    double memory = 2;
+    double disk = 3;
+    int32 containers_running = 4;
+    int32 containers_stopped = 5;
+    int32 reliability_score = 6;
+}
+
+message AnalyzeResponse {
+    string analysis = 1;
+    string timestamp = 2;
+}
