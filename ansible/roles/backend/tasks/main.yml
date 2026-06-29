@@ -1,0 +1,78 @@
+---
+# Role: backend — Deploys FastAPI backend
+
+- name: Install Python and pip
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+
+- name: Create app directory
+  file:
+    path: "{{ app_dir }}/backend"
+    state: directory
+    owner: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy backend source files
+  synchronize:
+    src: "{{ playbook_dir }}/../backend/"
+    dest: "{{ app_dir }}/backend/"
+    delete: true
+    rsync_opts:
+      - "--exclude=venv"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=incidents.db"
+
+- name: Create Python virtual environment
+  command: python3 -m venv "{{ app_dir }}/backend/venv"
+  args:
+    creates: "{{ app_dir }}/backend/venv"
+
+- name: Install Python dependencies
+  pip:
+    requirements: "{{ app_dir }}/backend/requirements.txt"
+    virtualenv: "{{ app_dir }}/backend/venv"
+
+- name: Copy .env file
+  template:
+    src: env.j2
+    dest: "{{ app_dir }}/backend/.env"
+    owner: "{{ app_user }}"
+    mode: '0600'   # Restrict permissions — key file!
+
+- name: Initialize database
+  command: "{{ app_dir }}/backend/venv/bin/python init_db.py"
+  args:
+    chdir: "{{ app_dir }}/backend"
+    creates: "{{ app_dir }}/backend/incidents.db"
+
+- name: Copy systemd service for backend
+  template:
+    src: cortexops-backend.service.j2
+    dest: /etc/systemd/system/cortexops-backend.service
+    mode: '0644'
+  notify: restart backend
+
+- name: Enable and start backend service
+  systemd:
+    name: cortexops-backend
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for backend to be ready
+  uri:
+    url: "http://localhost:{{ backend_port }}/health"
+    status_code: 200
+  retries: 10
+  delay: 3
+  register: backend_ready
+  until: backend_ready.status == 200
+
+- name: Backend is live
+  debug:
+    msg: "FastAPI backend running on port {{ backend_port }}"

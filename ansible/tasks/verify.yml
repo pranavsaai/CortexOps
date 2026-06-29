@@ -1,0 +1,34 @@
+---
+# Post-provisioning verification checks
+
+- name: Check Docker is running
+  systemd:
+    name: docker
+  register: docker_status
+  failed_when: docker_status.status.ActiveState != "active"
+
+- name: Check Prometheus container
+  command: docker ps --filter "name=prometheus" --format "{{ '{{' }}.Status{{ '}}' }}"
+  register: prom_status
+  changed_when: false
+  failed_when: "'Up' not in prom_status.stdout"
+
+- name: Check Node Exporter container
+  command: docker ps --filter "name=node-exporter" --format "{{ '{{' }}.Status{{ '}}' }}"
+  register: ne_status
+  changed_when: false
+  failed_when: "'Up' not in ne_status.stdout"
+
+- name: Check backend API
+  uri:
+    url: "http://localhost:{{ backend_port }}/health"
+    status_code: 200
+  register: backend_check
+
+- name: All checks passed
+  debug:
+    msg: |
+      Docker: Active
+      Prometheus: {{ prom_status.stdout }}
+      Node Exporter: {{ ne_status.stdout }}
+      Backend API: {{ backend_check.status }}

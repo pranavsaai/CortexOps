@@ -1,0 +1,6 @@
+---
+- name: restart backend
+  systemd:
+    name: cortexops-backend
+    state: restarted
+    daemon_reload: true

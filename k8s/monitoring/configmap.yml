@@ -1,0 +1,33 @@
+# ============================================================
+# Prometheus ConfigMap — scrape config stored as K8s resource
+# Changes here auto-reload Prometheus without pod restart
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: cortexops
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: "node-exporter"
+        static_configs:
+          - targets: ["node-exporter-service:9100"]
+
+      - job_name: "cortexops-backend"
+        static_configs:
+          - targets: ["backend-service:8000"]
+
+      - job_name: "kubernetes-pods"
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ["cortexops"]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"

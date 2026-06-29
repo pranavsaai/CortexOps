@@ -1,0 +1,18 @@
+[Unit]
+Description=CortexOps Next.js Frontend
+After=network.target cortexops-backend.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+WorkingDirectory={{ app_dir }}/frontend
+ExecStart=/usr/bin/npm start -- -p {{ frontend_port }}
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cortexops-frontend
+
+[Install]
+WantedBy=multi-user.target

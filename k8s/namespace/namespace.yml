@@ -1,0 +1,8 @@
+# CortexOps — Namespace
+# All resources live in this namespace — clean isolation
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cortexops
+  labels:
+    app: cortexops

@@ -1,0 +1,50 @@
+---
+# Role: monitoring — Deploys Prometheus + Grafana + Node Exporter via Docker Compose
+
+- name: Create monitoring directory
+  file:
+    path: "{{ app_dir }}/monitoring"
+    state: directory
+    owner: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy prometheus config
+  template:
+    src: prometheus.yml.j2
+    dest: "{{ app_dir }}/monitoring/prometheus.yml"
+    owner: "{{ app_user }}"
+    mode: '0644'
+  notify: restart monitoring stack
+
+- name: Copy docker-compose for monitoring
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ app_dir }}/monitoring/docker-compose.yml"
+    owner: "{{ app_user }}"
+    mode: '0644'
+  notify: restart monitoring stack
+
+- name: Pull monitoring images
+  command: docker compose pull
+  args:
+    chdir: "{{ app_dir }}/monitoring"
+  changed_when: false
+
+- name: Start monitoring stack
+  command: docker compose up -d
+  args:
+    chdir: "{{ app_dir }}/monitoring"
+  register: compose_out
+
+- name: Wait for Prometheus to be ready
+  uri:
+    url: "http://localhost:{{ prometheus_port }}/-/ready"
+    status_code: 200
+  retries: 10
+  delay: 5
+  register: prometheus_ready
+  until: prometheus_ready.status == 200
+
+- name: Confirm monitoring stack is up
+  debug:
+    msg: "Prometheus, Grafana, Node Exporter are running!"
