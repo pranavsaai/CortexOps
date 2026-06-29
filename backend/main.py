@@ -287,3 +287,63 @@ def analytics(auth: dict = Depends(get_api_key)):
 @app.get("/cache-stats")
 def cache_stats(auth: dict = Depends(get_api_key)):
     return get_cache_stats()
+
+# ── WebSocket endpoints ─────────────────────────────────────────────────────
+
+from fastapi import WebSocket, WebSocketDisconnect
+from websocket_manager import manager, stream_metrics
+
+@app.websocket("/ws/metrics")
+async def websocket_metrics(websocket: WebSocket):
+    """
+    Real-time metrics streaming via WebSocket!
+    Connect: ws://localhost:8000/ws/metrics
+    Updates every 5 seconds automatically!
+    """
+    await stream_metrics(websocket)
+
+@app.websocket("/ws/alerts")
+async def websocket_alerts(websocket: WebSocket):
+    """Alert-only WebSocket — only sends when something is wrong!"""
+    from services.prometheus_service import get_cpu_usage, get_memory_usage, get_disk_usage
+    import asyncio
+
+    await manager.connect(websocket)
+    try:
+        await websocket.send_json({
+            "type": "connected",
+            "message": "CortexOps alert stream connected!"
+        })
+        while True:
+            cpu = get_cpu_usage()
+            memory = get_memory_usage()
+            disk = get_disk_usage()
+
+            alerts = []
+            if cpu > 80:
+                alerts.append({"severity": "CRITICAL", "metric": "cpu", "value": cpu})
+            if memory > 85:
+                alerts.append({"severity": "WARNING", "metric": "memory", "value": memory})
+            if disk > 90:
+                alerts.append({"severity": "CRITICAL", "metric": "disk", "value": disk})
+
+            if alerts:
+                await websocket.send_json({
+                    "type": "alerts",
+                    "alerts": alerts,
+                    "timestamp": __import__("datetime").datetime.now().isoformat()
+                })
+
+            await asyncio.sleep(10)
+    except Exception:
+        pass
+    finally:
+        manager.disconnect(websocket)
+
+@app.get("/ws/stats")
+def ws_stats(auth: dict = Depends(get_api_key)):
+    """How many WebSocket clients connected?"""
+    return {
+        "active_connections": manager.connection_count,
+        "timestamp": datetime.now().isoformat()
+    }
