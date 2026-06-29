@@ -3,7 +3,7 @@ import os
 import time
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
@@ -16,6 +16,8 @@ from services.docker_service import get_containers
 from services.history_service import save_snapshot, get_history, log_request, get_request_analytics
 from services.recommendation_service import get_recommendations
 from services.ai_service import get_ai_analysis, get_ai_chat_response, API_KEY
+from services.auth_service import create_api_key, list_api_keys, revoke_api_key
+from auth_middleware import get_api_key, get_optional_api_key
 
 app = FastAPI(
     title="CortexOps AI",
@@ -31,14 +33,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# request logging middleware — every request log avutundi!
+# request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
-    duration = (time.time() - start) * 1000  # ms lo
+    duration = (time.time() - start) * 1000
 
-    # background lo log cheyyi — request slow avvadam ledu!
     try:
         log_request(
             endpoint=request.url.path,
@@ -47,11 +48,10 @@ async def log_requests(request: Request, call_next):
             response_time_ms=round(duration, 2)
         )
     except Exception:
-        pass  # logging fail aithe app crash avvadam ledu
+        pass
 
     return response
 
-# startup lo DB init cheyyi
 @app.on_event("startup")
 async def startup():
     print("Starting CortexOps v2...")
@@ -62,6 +62,11 @@ class ChatRequest(BaseModel):
     message: str
     context: dict = {}
 
+class CreateKeyRequest(BaseModel):
+    name: str
+
+# ── Public endpoints — no auth needed ──────────────────────────────────────
+
 @app.get("/")
 def home():
     return {
@@ -70,7 +75,8 @@ def home():
         "status": "running",
         "ai_enabled": bool(API_KEY),
         "database": "PostgreSQL",
-        "features": ["monitoring", "ai-analysis", "incidents", "request-logging"]
+        "auth": "API Key",
+        "features": ["monitoring", "ai-analysis", "incidents", "request-logging", "api-keys"]
     }
 
 @app.get("/health")
@@ -81,20 +87,45 @@ def health():
 def ai_status():
     return {"ai_enabled": bool(API_KEY)}
 
+# ── API Key management endpoints ────────────────────────────────────────────
+
+@app.post("/api-keys")
+def create_key(
+    request: CreateKeyRequest,
+    auth: dict = Depends(get_api_key)  # only authenticated users can create keys
+):
+    """Create new API key — master key required!"""
+    return create_api_key(request.name)
+
+@app.get("/api-keys")
+def get_keys(auth: dict = Depends(get_api_key)):
+    """List all API keys"""
+    return list_api_keys()
+
+@app.delete("/api-keys/{key_id}")
+def delete_key(key_id: int, auth: dict = Depends(get_api_key)):
+    """Revoke API key"""
+    success = revoke_api_key(key_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="API key not found")
+    return {"message": f"Key {key_id} revoked successfully"}
+
+# ── Protected endpoints — API key required ──────────────────────────────────
+
 @app.get("/cpu")
-def cpu():
+def cpu(auth: dict = Depends(get_api_key)):
     return {"cpu": get_cpu_usage()}
 
 @app.get("/memory")
-def memory():
+def memory(auth: dict = Depends(get_api_key)):
     return {"memory": get_memory_usage()}
 
 @app.get("/disk")
-def disk():
+def disk(auth: dict = Depends(get_api_key)):
     return {"disk": get_disk_usage()}
 
 @app.get("/dashboard")
-def dashboard():
+def dashboard(auth: dict = Depends(get_api_key)):
     cpu = get_cpu_usage()
     memory = get_memory_usage()
     disk = get_disk_usage()
@@ -123,11 +154,12 @@ def dashboard():
         "recommendations": recommendations,
         "containers_running": running,
         "containers_stopped": stopped,
-        "containers_total": len(containers)
+        "containers_total": len(containers),
+        "requested_by": auth.get("name", "unknown")  # who called this!
     }
 
 @app.post("/ai-analyze")
-def ai_analyze():
+def ai_analyze(auth: dict = Depends(get_api_key)):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="AI not configured.")
 
@@ -141,7 +173,6 @@ def ai_analyze():
     incidents = get_incidents()
 
     analysis = get_ai_analysis(cpu, memory, disk, running, stopped, score, incidents)
-
     return {
         "analysis": analysis,
         "metrics_snapshot": {
@@ -152,7 +183,7 @@ def ai_analyze():
     }
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, auth: dict = Depends(get_api_key)):
     if not API_KEY:
         raise HTTPException(status_code=503, detail="AI not configured.")
     if not request.message.strip():
@@ -177,31 +208,30 @@ def chat(request: ChatRequest):
     return {"response": response, "timestamp": datetime.now().isoformat()}
 
 @app.get("/incidents")
-def incidents():
+def incidents(auth: dict = Depends(get_api_key)):
     return get_incidents()
 
 @app.get("/incident-summary")
-def incident_summary():
+def incident_summary(auth: dict = Depends(get_api_key)):
     return get_incident_stats()
 
 @app.get("/containers")
-def containers():
+def containers(auth: dict = Depends(get_api_key)):
     return get_containers()
 
 @app.get("/container-summary")
-def container_summary():
+def container_summary(auth: dict = Depends(get_api_key)):
     containers = get_containers()
     running = sum(1 for c in containers if c["status"] == "running")
     stopped = len(containers) - running
     return {"running": running, "stopped": stopped, "total": len(containers)}
 
 @app.get("/reliability-history")
-def reliability_history():
+def reliability_history(auth: dict = Depends(get_api_key)):
     return get_history()
 
-# NEW — request analytics endpoint
 @app.get("/analytics")
-def analytics():
+def analytics(auth: dict = Depends(get_api_key)):
     return {
         "request_analytics": get_request_analytics(),
         "timestamp": datetime.now().isoformat()
