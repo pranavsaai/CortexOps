@@ -1,0 +1,60 @@
+name: CortexOps Azure Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AZURE_RESOURCE_GROUP: cortexops-rg
+  AZURE_LOCATION: eastus
+  ACR_NAME: cortexopsacr
+  CONTAINER_APP_NAME: cortexops-api
+  CONTAINER_APP_ENV: cortexops-env
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to Azure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/cortexops:${{ github.sha }} ./backend
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/cortexops:latest ./backend
+
+      - name: Push to ACR
+        run: |
+          docker push ${{ env.ACR_NAME }}.azurecr.io/cortexops:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/cortexops:latest
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/cortexops:${{ github.sha }} \
+            --set-env-vars \
+              GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+              DATABASE_URL=${{ secrets.DATABASE_URL }} \
+              REDIS_URL=${{ secrets.REDIS_URL }} \
+              MASTER_API_KEY=${{ secrets.MASTER_API_KEY }} \
+              SECRET_KEY=${{ secrets.SECRET_KEY }}
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://cortexops-api.azurecontainerapps.io/health || exit 1
+          echo "Deployment successful!"
