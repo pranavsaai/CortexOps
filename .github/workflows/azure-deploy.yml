@@ -56,5 +56,5 @@ jobs:
       - name: Health check
         run: |
           sleep 30
-          curl -f https://cortexops-api.azurecontainerapps.io/health || exit 1
+          curl -f https://cortexops-api.ashycoast-10eb3ab5.centralindia.azurecontainerapps.io/health || exit 1
           echo "Deployment successful!"
